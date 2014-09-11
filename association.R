@@ -1,6 +1,6 @@
 setwd("../../../Dropbox/Diabetes/")
 
-data = read.csv("Data/merge_data..csv")
+data = read.csv("Data/merge_data.csv")
 indx.ref= grep("Ref", data$Sample.Identification)
 
 data.samples = data[-indx.ref, ]

@@ -24,7 +24,7 @@ outlier = function(x){
 data.samples[,metabolites] = sapply(data.samples[,metabolites], outlier)
                                                         
                                                         
-## Apply GEE model
+## Apply GEE model for the comparison between two groups
 data.samples$Group = factor(data.samples$Group, levels = c("NGT", "IGT"))
 
 if(!require(gee)) install.packages("gee")
@@ -35,20 +35,21 @@ for(m in metabolites){
   data.samples$m = data.samples[,m]
   if(sum(is.na(data.samples$m))<0.5*nrow(data.samples)){
     
-    model = gee((as.numeric(Group)-1) ~ m #+ as.factor(SEX) + AGE 
-                #+ BMI + Syst.0 + HDLMG + HBA1C 
-                #+ BZN0 + INS0_neu
+    model = gee((as.numeric(Group)-1) ~ m 
+                + as.factor(SEX) + AGE 
+                + BMI + Syst.0 + HDLMG 
+                #+ HBA1C + BZN0 + INS0_neu
                 ,id = ID, data = data.samples, 
                 na.action=na.omit, family = binomial, contrasts = "exchangeable")
     
-    model = gee(m ~ time.point*Group #+ as.factor(SEX) + AGE 
-                #+ BMI + Syst.0 + HDLMG + HBA1C 
-                #+ BZN0 + INS0_neu
-                ,id = ID, data = data.samples, 
-                na.action=na.omit,  contrasts = "exchangeable")
-    model.coef = coef(summary(model))
-    pvalues = 2 * pnorm(abs(model.coef)[,5], lower.tail = FALSE)
-    model.coef = cbind(model.coef, pvalues)
+#     model = gee(m ~ time.point*Group #+ as.factor(SEX) + AGE 
+#                 #+ BMI + Syst.0 + HDLMG + HBA1C 
+#                 #+ BZN0 + INS0_neu
+#                 ,id = ID, data = data.samples, 
+#                 na.action=na.omit,  contrasts = "exchangeable")
+#     model.coef = coef(summary(model))
+#     pvalues = 2 * pnorm(abs(model.coef)[,5], lower.tail = FALSE)
+#     model.coef = cbind(model.coef, pvalues)
     
     model.coef = coef(summary(model))[2,]
     pvalues = 2 * pnorm(abs(model.coef)[5], lower.tail = FALSE)
@@ -58,7 +59,7 @@ for(m in metabolites){
 }
 rownames(rst) = metabolites
 
-write.csv(rst, file = "unadjusted model.csv")
+write.csv(rst, file = "multivaraite_model 1.csv")
 
 ## Apply mixed effect model
 require("lme4")
@@ -101,13 +102,12 @@ write.csv(rst, file = "full model_lme_categorized.csv")
 ## Association with insulin sensitivity
 rst = NULL
 for(m in valid_measures){
-
   metabo.3t = matrix(data.samples[,m],ncol = 3, byrow = T)
   colnames(metabo.3t) = c("T0", "T60", "T120")
   tmppheno = data.samples[which(data.samples$time.point==1),colnames(pheno)]
   tmpdata = data.frame(tmppheno, metabo.3t)
   
-  model = lm(log(ISIMATS_neu) ~ T0 + T60 + T120 
+  model = lm(log(ISIMATS_neu) ~ T120 
               + as.factor(SEX) + AGE 
               + BMI + Syst.0 + HDLMG 
 #              + HBA1C + BZN0 + INS0_neu 
@@ -119,28 +119,33 @@ rownames(rst) = valid_measures
 write.csv(rst, file = "associations between T120 metabolite leve and insulin sensitivity_multivaraite model_2.csv")
 
 
-model = lm(ISIMATS_neu ~ BZN0 + INS0_neu 
-           + BZ60 + INS60_neu
-           + BZ120 + INS120_neu
-           , na.action = na.omit, 
-           data = tmpdata)
-plot(tmpdata$ISIMATS_neu, exp(predict(model1)))
-plot(tmpdata$ISIMATS_neu, predict(model2))
+# model = lm(ISIMATS_neu ~ BZN0 + INS0_neu 
+#            + BZ60 + INS60_neu
+#            + BZ120 + INS120_neu
+#            , na.action = na.omit, 
+#            data = tmpdata)
+# plot(tmpdata$ISIMATS_neu, exp(predict(model1)))
+# plot(tmpdata$ISIMATS_neu, predict(model2))
+# 
+# pairs(tmpdata[, c("T0", "T60", "T120", "ISIMATS_neu")])
 
-pairs(tmpdata[, c("T0", "T60", "T120", "ISIMATS_neu")])
 
-# plot of correlations
-cor1 = cor(x = data.samples$ISIMATS_neu[which(data.samples$time.point==1)], 
-    y = data.samples[which(data.samples$time.point==1),valid_measures[-c(156,157)]],
-    use = "pair", method = "spearman")
-cor2 = cor(x = data.samples$ISIMATS_neu[which(data.samples$time.point==2)], 
-           y = data.samples[which(data.samples$time.point==2),valid_measures[-c(156,157)]],
-           use = "pair", method = "spearman")
-cor3 = cor(x = data.samples$ISIMATS_neu[which(data.samples$time.point==3)], 
-           y = data.samples[which(data.samples$time.point==3),valid_measures[-c(156,157)]],
-           use = "pair", method = "spearman")
-cor.ISIMATS_metabo = t(rbind(cor1, cor2, cor3))
 
+## Correlations between metabolites and insulin sensitivity
+cor.test.2 = function(x, y, ...){
+  corr = cor.test(x, y, ...)
+  return(c(corr$estimate, corr$p.value))
+}
+
+cor.ISIMATS_metabo = NULL
+for(i in 1:3){
+  cor.tmp = sapply(data.samples[which(data.samples$time.point==i),valid_measures], 
+                 cor.test.2, data.samples$ISIMATS_neu[which(data.samples$time.point==1)], 
+                 use = "pair", method = "spearman")
+  cor.ISIMATS_metabo = cbind(cor.ISIMATS_metabo, t(cor.tmp))
+}
+
+# plot the correlations
 require(corrplot)
 pdf("correlation between Insulin sensitivity and metabolties.pdf", width = 4, height = 10)
 for( i in 1:8){
@@ -152,4 +157,48 @@ for( i in 1:8){
 dev.off()
 
 
+## correlation between H1, glucose and insulin sensitivity
+# correlation between H1 and blood glucose
+(cor_0=cor.test(~H1+BZN0, data = data.samples, subset = time.point==1, method = "spearman"))
+(cor_60=cor.test(~H1+BZ60, data = data.samples, subset = time.point==2, method = "spearman"))
+(cor_120=cor.test(~H1+BZ120, data = data.samples, subset = time.point==3, method = "spearman"))
+par(mfrow = c(2,2))
+plot(H1~BZN0, data = data.samples, subset = time.point==1)
+legend("topleft", legend = paste("Correlation:", round(cor_0$estimate,3), ", p=", format(cor_0$p.value, scientific = T, digits = 3)))
+plot(H1~BZ60, data = data.samples, subset = time.point==2)
+legend("topleft", legend = paste("Correlation:", round(cor_60$estimate,3), "p=", format(cor_60$p.value, scientific = T, digits = 3)))
+plot(H1~BZ120, data = data.samples, subset = time.point==3)
+legend("topleft", legend = paste("Correlation:", round(cor_120$estimate,3), "p=", format(cor_120$p.value, scientific = T, digits = 3)))
 
+# correlation between blood glucose and insulin sensitivity
+(cor_0 = cor.test(~ISIMATS_neu+BZN0, data = pheno, subset = time.point==1, method = "spearman"))
+(cor_60 = cor.test(~ISIMATS_neu+BZ60, data = pheno, subset = time.point==2, method = "spearman"))
+(cor_120 = cor.test(~ISIMATS_neu+BZ120, data = pheno, subset = time.point==3, method = "spearman"))
+par(mfrow = c(2,2))
+plot(ISIMATS_neu~BZN0, data = data.samples, subset = time.point==1, log = "xy")
+legend("topleft", legend = paste("Correlation:", round(cor_0$estimate,3), ", p=", format(cor_0$p.value, scientific = T, digits = 3)))
+plot(ISIMATS_neu~BZ60, data = data.samples, subset = time.point==2, log = "xy")
+legend("topleft", legend = paste("Correlation:", round(cor_60$estimate,3), "p=", format(cor_60$p.value, scientific = T, digits = 3)))
+plot(ISIMATS_neu~BZ120, data = data.samples, subset = time.point==3, log = "xy")
+legend("topleft", legend = paste("Correlation:", round(cor_120$estimate,3), "p=", format(cor_120$p.value, scientific = T, digits = 3)))
+
+# correlation between H1 and insulin sensitivity
+(cor_0 = cor.test(~ISIMATS_neu+H1, data = data.samples, subset = time.point==1, method = "spearman"))
+(cor_60 = cor.test(~ISIMATS_neu+H1, data = data.samples, subset = time.point==2, method = "spearman"))
+(cor_120 = cor.test(~ISIMATS_neu+H1, data = data.samples, subset = time.point==3, method = "spearman"))
+par(mfrow = c(2,2))
+plot(ISIMATS_neu~H1, data = data.samples, subset = time.point==1, log = "xy")
+legend("topleft", legend = paste("Correlation:", round(cor_0$estimate,3), ", p=", format(cor_0$p.value, scientific = T, digits = 3)))
+plot(ISIMATS_neu~H1, data = data.samples, subset = time.point==2, log = "xy")
+legend("topleft", legend = paste("Correlation:", round(cor_60$estimate,3), "p=", format(cor_60$p.value, scientific = T, digits = 3)))
+plot(ISIMATS_neu~H1, data = data.samples, subset = time.point==3, log = "xy")
+legend("topleft", legend = paste("Correlation:", round(cor_120$estimate,3), "p=", format(cor_120$p.value, scientific = T, digits = 3)))
+
+
+
+table(data.samples$Plate.Bar.Code, data.samples$time.point)
+table(data.samples$OP, data.samples$time.point)
+table(data.samples$KitBarcodeNr, data.samples$time.point)
+table(data.samples$Plate.Note, data.samples$time.point)
+table(data.samples$Injection.Number, data.samples$time.point)
+table(data.samples$Measurement.Time, data.samples$time.point)

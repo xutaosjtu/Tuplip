@@ -43,13 +43,14 @@ dev.off()
 
 
 
-## plot
+## plot the metabolite concentration at different time points in two groups
 require(grid)
 require(ggplot2)
 
-## 
+# function for choosing the position in the view port
 vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
 
+## plot mean (95%CI) metabolite concentration
 pdf("test.pdf", width = 10)
 ## position matrix of the plots
 position = rbind(c(1,1), c(1,2), c(2,1), c(2,2)); k = 1
@@ -122,7 +123,7 @@ dev.off()
 
 
 
-
+## association between insulin sensitivity and metabolites
 pdf("Insulin sensitivity index associated with metabolites.pdf", width = 10, height = 4)
 mf_labeller <- function(var, value){
   value <- as.character(value)

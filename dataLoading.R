@@ -20,5 +20,5 @@ pheno = read.csv("Data/sc.csv")
 data.samples = merge(data.samples, pheno)
 
 ## 5. load the list valid metabolites
-valid_measures = read.csv("Valid measures.csv",stringsAsFactors=F)
+valid_measures = read.csv("Valid measures.csv",stringsAsFactors=F, header = F)
 valid_measures = valid_measures[which(valid_measures[,2]),1]

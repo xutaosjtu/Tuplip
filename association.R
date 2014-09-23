@@ -22,8 +22,19 @@ outlier = function(x){
   else {x[which(x>m+5*sd | x<m-5*sd)]=NA; return(x)}
 }
 data.samples[,metabolites] = sapply(data.samples[,metabolites], outlier)
+
+data.samples = data.samples[order(data.samples$ID, data.samples$time.point),]
+
+data.samples$BZ = NA
+data.samples$BZ[(1:146)*3-2] = data.samples$BZN0[(1:146)*3-2]
+data.samples$BZ[(1:146)*3-1] = data.samples$BZ60[(1:146)*3-1]
+data.samples$BZ[(1:146)*3] = data.samples$BZ120[(1:146)*3]
                                                         
-                                                        
+data.samples$INS = NA
+data.samples$INS[(1:146)*3-2] = data.samples$INS0_neu[(1:146)*3-2]
+data.samples$INS[(1:146)*3-1] = data.samples$INS60_neu[(1:146)*3-1]
+data.samples$INS[(1:146)*3] = data.samples$INS120_neu[(1:146)*3]
+
 ## Apply GEE model for the comparison between two groups
 data.samples$Group = factor(data.samples$Group, levels = c("NGT", "IGT"))
 
@@ -35,10 +46,10 @@ for(m in metabolites){
   data.samples$m = data.samples[,m]
   if(sum(is.na(data.samples$m))<0.5*nrow(data.samples)){
     
-    model = gee((as.numeric(Group)-1) ~ m 
+    model = gee((as.numeric(Group)-1) ~ scale(BZ)
                 + as.factor(SEX) + AGE 
-                + BMI + Syst.0 + HDLMG 
-                #+ HBA1C + BZN0 + INS0_neu
+#                + BMI + Syst.0 + HDLMG 
+#                + HBA1C  +BZN0 + INS0_neu
                 ,id = ID, data = data.samples, 
                 na.action=na.omit, family = binomial, contrasts = "exchangeable")
     
@@ -107,7 +118,7 @@ for(m in valid_measures){
   tmppheno = data.samples[which(data.samples$time.point==1),colnames(pheno)]
   tmpdata = data.frame(tmppheno, metabo.3t)
   
-  model = lm(log(ISIMATS_neu) ~ T120 
+  model = lm(log(ISIMATS_neu) ~ T0 
               + as.factor(SEX) + AGE 
               + BMI + Syst.0 + HDLMG 
 #              + HBA1C + BZN0 + INS0_neu 
@@ -116,7 +127,18 @@ for(m in valid_measures){
   rst = rbind(rst, summary(model)$coef[2,])
 }
 rownames(rst) = valid_measures
-write.csv(rst, file = "associations between T120 metabolite leve and insulin sensitivity_multivaraite model_2.csv")
+write.csv(rst, file = "associations between T0 metabolite level and insulin sensitivity_multivaraite model_2.csv")
+
+#Gly + lysoPC.a.C18.2 + Ile + PC.aa.C32.1 + PC.aa.C38.3+
+model = lm(log(ISIMATS_neu) ~ scale(log(INS))+
+           as.factor(SEX) + AGE 
+           + BMI + Syst.0 + HDLMG 
+#            + HBA1C + BZN0 + INS0_neu 
+           , na.action = na.omit, 
+           subset = time.point==3,
+           data = data.samples)
+summary(model)
+plot(model$model$'log(ISIMATS_neu)', predict(model))
 
 
 # model = lm(ISIMATS_neu ~ BZN0 + INS0_neu 

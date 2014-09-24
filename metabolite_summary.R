@@ -1,11 +1,21 @@
 source("dataLoading.R")
 
+## remove measurements with 5sd
+outlier = function(x){
+  m = mean(x, na.rm = T)
+  sd = sd(x, na.rm = T)
+  if (is.na(m)|is.na(sd)){return(x)}
+  else {x[which(x>m+5*sd | x<m-5*sd)]=NA; return(x)}
+}
+data.samples[,metabolites] = sapply(data.samples[,metabolites], outlier)
+
+
 ##Calculate the mean and sd of the metabolites
-metabo.mean = sapply(data.samples[, metabolites], 
+metabo.mean = sapply(data.samples[, c( "BZ", "INS",metabolites)], 
                      function(x){
                        tapply(x, INDEX = interaction(data.samples$time.point,data.samples$Group), mean, na.rm = T)
                      })
-metabo.sd = sapply(data.samples[, metabolites], 
+metabo.sd = sapply(data.samples[, c("BZ", "INS",metabolites)], 
                    function(x){
                      tapply(x, INDEX = interaction(data.samples$time.point,data.samples$Group), sd, na.rm = T)
                    })
@@ -13,33 +23,33 @@ write.csv(rbind(metabo.mean, metabo.sd), file = "metabolite mean and sd.csv")
 
 
 ## Average value and sd of blood sugar("BZN0","BZ60","BZ120") and insulin ("INS0_neu" ,"INS60_neu","INS120_neu")
-Mean = sapply(pheno[,c("INS0_neu" ,"INS60_neu","INS120_neu")], 
-              function(x){
-                tapply(x, INDEX = pheno$Group, mean, na.rm = T)
-                })
-Mean = c(Mean[1,],Mean[2,]) 
-SD = sapply(pheno[,c("INS0_neu" ,"INS60_neu","INS120_neu")], 
-            function(x){
-              tapply(x, INDEX = pheno$Group, sd, na.rm = T)
-            })
-SD = c(SD[1,],SD[2,])
-tmp = data.frame(mean = Mean, 
-                 sd = SD, 
-                 time = rep(c(1:3),2), 
-                 group = rep(c("IGT", "NGT"), each = 3)
-)
-
-pdf("Blood sugar.pdf", width = 10)
-grid.newpage()
-grid.rect(gp=gpar(fill="grey"))
-pushViewport(viewport(layout=grid.layout(2, 2)))
-p = ggplot(tmp, aes(x = time, y = mean, colour = group, group = group)) + 
-  geom_errorbar(aes(ymin = mean-sd/sqrt(73), ymax = mean + sd/sqrt(73)), 
-                width = .1, position = pd) + 
-  geom_line(position = pd) + geom_point(position = pd) +
-  ggtitle("Blood sugar")
-print(p)
-dev.off()
+# Mean = sapply(pheno[,c("INS0_neu" ,"INS60_neu","INS120_neu")], 
+#               function(x){
+#                 tapply(x, INDEX = pheno$Group, mean, na.rm = T)
+#                 })
+# Mean = c(Mean[1,],Mean[2,]) 
+# SD = sapply(pheno[,c("INS0_neu" ,"INS60_neu","INS120_neu")], 
+#             function(x){
+#               tapply(x, INDEX = pheno$Group, sd, na.rm = T)
+#             })
+# SD = c(SD[1,],SD[2,])
+# tmp = data.frame(mean = Mean, 
+#                  sd = SD, 
+#                  time = rep(c(1:3),2), 
+#                  group = rep(c("IGT", "NGT"), each = 3)
+# )
+# 
+# pdf("Blood sugar.pdf", width = 10)
+# grid.newpage()
+# grid.rect(gp=gpar(fill="grey"))
+# pushViewport(viewport(layout=grid.layout(2, 2)))
+# p = ggplot(tmp, aes(x = time, y = mean, colour = group, group = group)) + 
+#   geom_errorbar(aes(ymin = mean-sd/sqrt(73), ymax = mean + sd/sqrt(73)), 
+#                 width = .1, position = pd) + 
+#   geom_line(position = pd) + geom_point(position = pd) +
+#   ggtitle("Blood sugar")
+# print(p)
+# dev.off()
 
 
 
@@ -51,10 +61,10 @@ require(ggplot2)
 vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
 
 ## plot mean (95%CI) metabolite concentration
-pdf("test.pdf", width = 10)
+pdf("test2.pdf", width = 10)
 ## position matrix of the plots
 position = rbind(c(1,1), c(1,2), c(2,1), c(2,2)); k = 1
-for(i in which(colnames(metabo.mean) %in% valid_measures)){
+for(i in which(colnames(metabo.mean) %in% c("BZ", "INS", valid_measures))){
   
   ## for every four figures great a new page
   if(k %% 4 == 1){

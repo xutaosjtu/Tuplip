@@ -10,7 +10,9 @@ data.samples$ID = as.numeric(data.samples$ID)
 
 ## log transformation and standardization
 transform = function(x){
-  return(scale(log(x)))
+  x = log(x)
+  if(sum(is.infinite(x))!=0) x[which(is.infinite(x))]=NA
+  return(scale(x))
 }
 data.samples[,metabolites] = sapply(data.samples[, metabolites], transform)
 
@@ -18,10 +20,12 @@ data.samples[,metabolites] = sapply(data.samples[, metabolites], transform)
 outlier = function(x){
   m = mean(x, na.rm = T)
   sd = sd(x, na.rm = T)
+  if(length(which(x>m+5*sd | x<m-5*sd))!=0) print(length(which(x>m+5*sd | x<m-5*sd)))
   if (is.na(m)|is.na(sd)){return(x)}
   else {x[which(x>m+5*sd | x<m-5*sd)]=NA; return(x)}
 }
 data.samples[,metabolites] = sapply(data.samples[,metabolites], outlier)
+
 
 data.samples = data.samples[order(data.samples$ID, data.samples$time.point),]
 
@@ -42,13 +46,13 @@ if(!require(gee)) install.packages("gee")
 require(gee)
 
 rst = NULL
-for(m in metabolites){
+for(m in valid_measures){
   data.samples$m = data.samples[,m]
   if(sum(is.na(data.samples$m))<0.5*nrow(data.samples)){
     
-    model = gee((as.numeric(Group)-1) ~ scale(BZ)
+    model = gee((as.numeric(Group)-1) ~ m
                 + as.factor(SEX) + AGE 
-#                + BMI + Syst.0 + HDLMG 
+                + BMI + Syst.0 + HDLMG 
 #                + HBA1C  +BZN0 + INS0_neu
                 ,id = ID, data = data.samples, 
                 na.action=na.omit, family = binomial, contrasts = "exchangeable")
@@ -68,9 +72,9 @@ for(m in metabolites){
   }
   else rst = rbind(rst, NA)
 }
-rownames(rst) = metabolites
+rownames(rst) = valid_measures
 
-write.csv(rst, file = "multivaraite_model 1.csv")
+write.csv(rst, file = "multivaraite_model_all data.csv")
 
 ## Apply mixed effect model
 require("lme4")
@@ -113,21 +117,38 @@ write.csv(rst, file = "full model_lme_categorized.csv")
 ## Association with insulin sensitivity
 rst = NULL
 for(m in valid_measures){
-  metabo.3t = matrix(data.samples[,m],ncol = 3, byrow = T)
-  colnames(metabo.3t) = c("T0", "T60", "T120")
-  tmppheno = data.samples[which(data.samples$time.point==1),colnames(pheno)]
-  tmpdata = data.frame(tmppheno, metabo.3t)
   
-  model = lm(log(ISIMATS_neu) ~ T0 
-              + as.factor(SEX) + AGE 
-              + BMI + Syst.0 + HDLMG 
-#              + HBA1C + BZN0 + INS0_neu 
+  data.samples$m = data.samples[,m]
+  
+  model_0 = lm(log(ISIMATS_neu) ~m +
+               as.factor(SEX) + AGE 
+             #+ BMI + Syst.0 + HDLMG 
+             #            + HBA1C + BZN0 + INS0_neu 
              , na.action = na.omit, 
-             data = tmpdata)
-  rst = rbind(rst, summary(model)$coef[2,])
+             subset = time.point==1,
+             data = data.samples)
+  
+  model_60 = lm(log(ISIMATS_neu) ~m +
+               as.factor(SEX) + AGE 
+            # + BMI + Syst.0 + HDLMG 
+             #            + HBA1C + BZN0 + INS0_neu 
+             , na.action = na.omit, 
+             subset = time.point==2,
+             data = data.samples)
+  
+  model_120 = lm(log(ISIMATS_neu) ~m +
+               as.factor(SEX) + AGE 
+             #+ BMI + Syst.0 + HDLMG 
+             #            + HBA1C + BZN0 + INS0_neu 
+             , na.action = na.omit, 
+             subset = time.point==3,
+             data = data.samples)
+  rst = rbind(rst, 
+              c(summary(model_0)$coef[2,], summary(model_60)$coef[2,], summary(model_120)$coef[2,])
+              )
 }
 rownames(rst) = valid_measures
-write.csv(rst, file = "associations between T0 metabolite level and insulin sensitivity_multivaraite model_2.csv")
+write.csv(rst, file = "associations between metabolite and insulin sensitivity_crude model_all data.csv")
 
 #Gly + lysoPC.a.C18.2 + Ile + PC.aa.C32.1 + PC.aa.C38.3+
 model = lm(log(ISIMATS_neu) ~ scale(log(INS))+

@@ -50,21 +50,19 @@ for(m in valid_measures){
   data.samples$m = data.samples[,m]
   if(sum(is.na(data.samples$m))<0.5*nrow(data.samples)){
     
-    model = gee((as.numeric(Group)-1) ~ m
+#     model = gee((as.numeric(Group)-1)~ m 
+#                  + as.factor(SEX) + AGE 
+#                  + BMI + Syst.0 + HDLMG 
+#                  + HBA1C  +BZN0 + INS0_neu
+#                 ,id = ID, data = data.samples, 
+#                 na.action=na.omit, family = binomial, contrast = "exchangeable")
+    
+    model = gee(m ~ Group*time.point
                 + as.factor(SEX) + AGE 
                 + BMI + Syst.0 + HDLMG 
-#                + HBA1C  +BZN0 + INS0_neu
+                #+ HBA1C + BZN0 + INS0_neu
                 ,id = ID, data = data.samples, 
-                na.action=na.omit, family = binomial, contrasts = "exchangeable")
-    
-#     model = gee(m ~ time.point*Group #+ as.factor(SEX) + AGE 
-#                 #+ BMI + Syst.0 + HDLMG + HBA1C 
-#                 #+ BZN0 + INS0_neu
-#                 ,id = ID, data = data.samples, 
-#                 na.action=na.omit,  contrasts = "exchangeable")
-#     model.coef = coef(summary(model))
-#     pvalues = 2 * pnorm(abs(model.coef)[,5], lower.tail = FALSE)
-#     model.coef = cbind(model.coef, pvalues)
+                na.action=na.omit,  corstr = "exchangeable")
     
     model.coef = coef(summary(model))[2,]
     pvalues = 2 * pnorm(abs(model.coef)[5], lower.tail = FALSE)
@@ -74,7 +72,7 @@ for(m in valid_measures){
 }
 rownames(rst) = valid_measures
 
-write.csv(rst, file = "multivaraite_model_all data.csv")
+write.csv(rst, file = "Multivariate model_linear interaction_all data.csv")
 
 ## Apply mixed effect model
 require("lme4")
